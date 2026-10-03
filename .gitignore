@@ -1,0 +1,53 @@
+# ===========================
+# Dependencies
+# ===========================
+node_modules/
+
+# ===========================
+# Build Outputs
+# ===========================
+frontend/dist/
+dist/
+build/
+
+# ===========================
+# Environment & Secrets (CRITICAL - Never commit real secrets!)
+# ===========================
+.env
+backend/.env
+frontend/.env
+.env.local
+.env.*.local
+
+# ===========================
+# SQLite Database Files (runtime data, re-created via seed script)
+# ===========================
+backend/data/
+*.db
+*.db-shm
+*.db-wal
+
+# ===========================
+# Logs
+# ===========================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pids/
+*.pid
+*.seed
+
+# ===========================
+# OS / IDE Metadata
+# ===========================
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/
+
+# ===========================
+# Testing / Coverage Artifacts
+# ===========================
+coverage/
+.nyc_output/
