@@ -8,46 +8,45 @@ A secure, local-only web application developed for cybersecurity assessments. Th
 
 ```mermaid
 flowchart TD
-    subgraph Clients["User Personas & Client Layer"]
-        S["Student Browser<br/>(Alice / Bob)"]
-        F["Faculty Browser<br/>(Dr. Alan / Dr. Ada)"]
-        A["Admin Browser<br/>(Admin User)"]
+    subgraph Clients["Client Layer"]
+        S["Student Browser"]
+        F["Faculty Browser"]
+        A["Admin Browser"]
     end
 
-    subgraph Frontend["React (Vite) Single-Page Application"]
-        UI["Protected UI Views & Dashboards"]
-        PC["Security Assessment Probe Console"]
+    subgraph Frontend["React Frontend - Vite SPA"]
+        UI["Role-Guarded Dashboards"]
+        PC["Security Assessment Probe"]
     end
 
-    subgraph SecurityPerimeter["Express API Gateway & Security Middleware"]
-        HL["Helmet & CORS Gateway"]
-        RL["Rate Limiter (Brute-Force Shield)"]
-        ZV["Zod Schema Input Validator"]
-        AUTH["Auth Middleware (httpOnly Cookie / JWT)"]
-        RBAC["RBAC Middleware: requireRole(...)<br/>(Deny-by-Default)"]
-        OWN["Ownership & Anti-IDOR Middleware<br/>(Student & Faculty Assignment Checks)"]
-        ERR["Generic Safe Error Handler<br/>(Zero Stack-Trace Disclosure)"]
+    subgraph API["Express API Gateway - Security Middleware Stack"]
+        HL["Helmet + CORS"]
+        RL["Rate Limiter"]
+        ZV["Zod Input Validator"]
+        AUTH["Auth Middleware - JWT + httpOnly Cookie"]
+        RBAC["RBAC - requireRole - Deny by Default"]
+        OWN["Ownership Middleware - Anti-IDOR Check"]
+        ERR["Safe Error Handler - No Stack Traces"]
     end
 
-    subgraph Storage["Database & Audit Layer (SQLite WAL)"]
-        DB[(College Portal Relational DB)]
-        AL[(Immutable Security Audit Log)]
+    subgraph DB_Layer["Storage Layer - SQLite WAL"]
+        DB[("College Portal DB")]
+        AL[("Audit Log - Immutable")]
     end
 
-    S -->|HTTP/Cookies| UI
-    F -->|HTTP/Cookies| UI
-    A -->|HTTP/Cookies| UI
+    S --> UI
+    F --> UI
+    A --> UI
     UI -->|REST API Calls| HL
-    PC -->|Vulnerability Probes| HL
+    PC -->|Probe Requests| HL
 
     HL --> RL --> ZV --> AUTH --> RBAC --> OWN
 
-    OWN -->|Authorized Operations| DB
-    AUTH -.->|Login / Fail / Expire| AL
-    RBAC -.->|Unauthorized Access Denied (403)| AL
-    OWN -.->|IDOR / Unassigned Tampering Denied (403)| AL
-    DB -.->|Grade Mutations & Role Updates| AL
-    ERR --- SecurityPerimeter
+    OWN -->|Authorized Request| DB
+    AUTH -.->|Login Events| AL
+    RBAC -.->|Access Denied 403| AL
+    OWN -.->|IDOR Blocked 403| AL
+    DB -.->|Grade and Role Changes| AL
 ```
 
 ---
@@ -63,17 +62,17 @@ All routes follow a **Deny-by-Default** security posture. Any action or endpoint
 | `GET /api/auth/session` | Get active session state | ✅ | ✅ | ✅ | Verified via server-side JWT signature |
 | `GET /api/students/me` | View own student profile | ✅ | ❌ | ❌ | `requireRole('student')` + `req.user.id` |
 | `GET /api/students/me/grades` | View own enrolled grades | ✅ | ❌ | ❌ | Queries DB strictly for `req.user.id` |
-| `GET /api/students/:id/grades` | View specific student's grades | ❌ (Own only) | ❌ | ✅ | `requireStudentOwnership('studentId')` (Anti-IDOR) |
-| `GET /api/faculty/courses` | View assigned teaching courses | ❌ | ✅ | ❌ | `requireRole('faculty')` + `WHERE faculty_id = req.user.id` |
-| `GET /api/faculty/courses/:id/students` | View students in assigned course | ❌ | ✅ (Assigned) | ✅ | `requireFacultyCourseAssignment` middleware |
-| `POST /api/faculty/grades` | Update grade for course student | ❌ | ✅ (Assigned) | ✅ | Validates course assignment & enrollment |
+| `GET /api/students/:id/grades` | View specific student's grades | ❌ Own only | ❌ | ✅ | `requireStudentOwnership` Anti-IDOR |
+| `GET /api/faculty/courses` | View assigned teaching courses | ❌ | ✅ | ❌ | `requireRole('faculty')` + faculty_id filter |
+| `GET /api/faculty/courses/:id/students` | View students in assigned course | ❌ | ✅ Assigned | ✅ | `requireFacultyCourseAssignment` middleware |
+| `POST /api/faculty/grades` | Update grade for course student | ❌ | ✅ Assigned | ✅ | Validates course assignment & enrollment |
 | `GET /api/admin/users` | List all system accounts | ❌ | ❌ | ✅ | `requireRole('admin')` |
-| `POST /api/admin/users` | Provision new user account | ❌ | ❌ | ✅ | `requireRole('admin')` + bcrypt hash + Zod schema |
-| `PATCH /api/admin/users/:id/role` | Modify user role | ❌ | ❌ | ✅ | `requireRole('admin')` + self-demotion lockout check |
-| `DELETE /api/admin/users/:id` | Remove user account | ❌ | ❌ | ✅ | `requireRole('admin')` + self-delete lockout check |
+| `POST /api/admin/users` | Provision new user account | ❌ | ❌ | ✅ | `requireRole('admin')` + bcrypt + Zod |
+| `PATCH /api/admin/users/:id/role` | Modify user role | ❌ | ❌ | ✅ | `requireRole('admin')` + self-demotion lockout |
+| `DELETE /api/admin/users/:id` | Remove user account | ❌ | ❌ | ✅ | `requireRole('admin')` + self-delete lockout |
 | `GET /api/admin/records` | View all courses, students, marks | ❌ | ❌ | ✅ | `requireRole('admin')` |
 | `GET /api/admin/audit-logs` | Inspect immutable security log | ❌ | ❌ | ✅ | `requireRole('admin')` |
-| `ANY /undefined-route` | Undefined endpoints | ❌ (404) | ❌ (404) | ❌ (404) | Deny-by-default fallback handler |
+| `ANY /undefined-route` | Undefined endpoints | ❌ 404 | ❌ 404 | ❌ 404 | Deny-by-default fallback handler |
 
 ---
 
@@ -111,7 +110,7 @@ All dependencies are actively maintained and standard for enterprise Node.js env
 From the project root (`ioc/`):
 
 ```bash
-# 1. Install dependencies for both backend & frontend and seed the database
+# Install all dependencies and seed the database with synthetic data
 npm run setup
 ```
 
@@ -120,31 +119,31 @@ npm run setup
 #### 1. Backend Setup & Seeding
 ```bash
 cd backend
+cp .env.example .env       # copy env template, then set JWT_SECRET
 npm install
 npm run seed
 ```
 
 #### 2. Running Automated Security Tests
 ```bash
-cd backend
+# From project root
 npm test
 ```
 *Executes all 10 automated test cases (TC-01 to TC-10) and prints the pass/fail verification table.*
 
 #### 3. Starting the Backend API Server
 ```bash
-cd backend
-npm start
-# Runs at http://localhost:5000
+# From project root
+npm run server
+# API running at http://localhost:5000
 ```
 
 #### 4. Starting the Frontend UI
-In a separate terminal:
+In a second terminal:
 ```bash
-cd frontend
-npm install
-npm run dev
-# Runs at http://localhost:5173
+# From project root
+npm run dev:client
+# UI running at http://localhost:5173
 ```
 
 ---
@@ -156,8 +155,8 @@ All synthetic accounts share the default test password: `Password123!`
 | Role | Username | Password | Notes & Scope |
 | :--- | :--- | :--- | :--- |
 | **Administrator** | `admin_user` | `Password123!` | System oversight, user creation/role management, audit logs |
-| **Faculty 1** | `prof_alan` | `Password123!` | Instructor for **CS101** (Computer Systems) and **CS201** (Algorithms) |
-| **Faculty 2** | `prof_ada` | `Password123!` | Instructor for **CY301** (Network & App Security) |
+| **Faculty 1** | `prof_alan` | `Password123!` | Instructor for **CS101** and **CS201** |
+| **Faculty 2** | `prof_ada` | `Password123!` | Instructor for **CY301** |
 | **Student 1** | `student_alice` | `Password123!` | Enrolled in **CS101** (92.5) and **CY301** (95.0) |
 | **Student 2** | `student_bob` | `Password123!` | Enrolled in **CS101** (84.0) and **CS201** (78.5) |
 | **Student 3** | `student_charlie` | `Password123!` | Enrolled in **CS201** (88.0) and **CY301** (91.0) |
@@ -167,29 +166,25 @@ All synthetic accounts share the default test password: `Password123!`
 
 ## 6. Common Vulnerabilities & Mistakes Avoided
 
-| Vulnerability / Anti-Pattern | Description of Common Flaw | How This Codebase Avoids It | File Reference |
-| :--- | :--- | :--- | :--- |
-| **Client-Side Role Trust** | Trusting `req.body.role` or client-side storage to authorize actions. | Role is extracted **strictly** from cryptographically verified server-side JWT session and re-queried against the database. | [`backend/src/middleware/auth.js`](file:///d:/Projects/ioc/backend/src/middleware/auth.js) |
-| **Hidden Button Security (Security by Obscurity)** | Hiding UI buttons for unauthorized roles without server-side validation. | Server-side `requireRole(...)` middleware rejects unauthorized API requests with `403`, regardless of client manipulation. | [`backend/src/middleware/rbac.js`](file:///d:/Projects/ioc/backend/src/middleware/rbac.js) |
-| **Insecure Direct Object Reference (IDOR)** | Permitting users to fetch `/api/students/:id/grades` simply by changing the ID. | `requireStudentOwnership` ensures students can ONLY access records where `student_id` matches their own session ID. | [`backend/src/middleware/ownership.js`](file:///d:/Projects/ioc/backend/src/middleware/ownership.js) |
-| **Unassigned Course Tampering** | Allowing any faculty to edit any course grade. | `requireFacultyCourseAssignment` verifies the course instructor matches `req.user.id` before allowing updates. | [`backend/src/middleware/ownership.js`](file:///d:/Projects/ioc/backend/src/middleware/ownership.js) |
-| **Permissive Default Posture** | Allowing access to routes unless explicitly blocked. | **Deny-by-default**: Routes are blocked unless explicitly allowed by middleware; unmatched routes return `404/403`. | [`backend/src/app.js`](file:///d:/Projects/ioc/backend/src/app.js) |
-| **Information Disclosure / Leaky Errors** | Leaking stack traces or SQL errors on exceptions. | Centralized error handler masks internal diagnostics with generic `"Access denied"` or `"An unexpected error occurred"`. | [`backend/src/middleware/errorHandler.js`](file:///d:/Projects/ioc/backend/src/middleware/errorHandler.js) |
-| **Infinite / Long-Lived Sessions** | Session tokens never expire or last weeks. | JWT expiration set to `15m` idle time; cookies configure `maxAge: 900000` (15 min) with explicit logout invalidation. | [`backend/src/config/env.js`](file:///d:/Projects/ioc/backend/src/config/env.js) |
-| **Missing Audit Trail** | Silent access denials or untracked grade changes. | All logins, failures, denied access attempts, grade mutations, and role changes are stored in an immutable SQLite audit log. | [`backend/src/services/audit.service.js`](file:///d:/Projects/ioc/backend/src/services/audit.service.js) |
+| Vulnerability / Anti-Pattern | Common Flaw | How This Codebase Avoids It |
+| :--- | :--- | :--- |
+| **Client-Side Role Trust** | Trusting `req.body.role` to authorize actions. | Role is extracted strictly from cryptographically verified server-side JWT and re-queried against the DB. |
+| **Security by Obscurity** | Hiding UI buttons without server-side validation. | `requireRole(...)` rejects unauthorized API requests with `403` regardless of client state. |
+| **IDOR** | Permitting users to fetch any `/api/students/:id/grades` by changing the ID. | `requireStudentOwnership` ensures students can only access records matching their own session ID. |
+| **Unassigned Course Tampering** | Allowing any faculty to edit any course grade. | `requireFacultyCourseAssignment` verifies `courses.faculty_id === req.user.id` before any mutation. |
+| **Permissive Default** | Allowing access to routes unless explicitly blocked. | Deny-by-default: routes blocked unless explicitly allowed; unmatched routes return `404`. |
+| **Information Disclosure** | Leaking stack traces or SQL errors to the client. | Centralized error handler returns only generic `"Access denied"` — no internals exposed. |
+| **Long-Lived Sessions** | Session tokens never expire or last weeks. | JWT expiration set to `15m`; cookies set `maxAge: 900000` with explicit logout invalidation. |
+| **Missing Audit Trail** | Silent access denials and untracked mutations. | All logins, failures, access denials, grade changes, and role updates are stored in an immutable audit log. |
 
 ---
 
-## 7. Evidence Collection & Screenshot Guide
+## 7. Evidence & Screenshot Guide
 
-When compiling assessment deliverables, capture the following evidence:
-
-1. **Terminal Test Run**: Screenshot of `npm test` output showing all 10 test cases passing and the summary table.
-2. **Student Dashboard**: Screenshot showing Alice's own profile and her grades.
-3. **Student IDOR Block Proof**: In Student Dashboard, click *"Attempt Fetching Student #2 Grades"* and capture the green/red alert box displaying `HTTP 403 Response: IDOR Successfully Blocked`.
-4. **Faculty Dashboard**: Screenshot showing Dr. Alan Turing editing grades for CS101 and the success notification.
-5. **Faculty Unassigned Course Block**: In Faculty Dashboard, click *"Simulate Grade Tampering for Unassigned Course"* and capture `HTTP 403 Forbidden`.
-6. **Admin Dashboard**:
-   - Screenshot of User Management with role selector dropdowns.
-   - Screenshot of the **Central Security Audit Log Trail** displaying logged `LOGIN_SUCCESS`, `IDOR_VIOLATION_ATTEMPT`, `GRADE_UPDATE`, and `ROLE_CHANGE` events.
-7. **Interactive Assessment Probe Console**: Click *"Security Assessment Probe"* in the top navigation bar to demonstrate live penetration probes directly in the UI.
+1. **Automated Test Results**: Run `npm test` and screenshot all 10 tests passing with the summary table.
+2. **Student Dashboard**: Log in as `student_alice` — screenshot own profile and enrolled grades.
+3. **Anti-IDOR Proof**: Click *"Attempt Fetching Student #2 Grades"* — capture the `HTTP 403 IDOR Blocked` alert.
+4. **Faculty Grade Management**: Log in as `prof_alan` — screenshot the grade editor and success notification.
+5. **Course Assignment Guard**: Click *"Simulate Grade Tampering for Unassigned Course"* — capture the `HTTP 403 Forbidden` response.
+6. **Admin Audit Log**: Log in as `admin_user` — screenshot the Audit Log tab showing `LOGIN_SUCCESS`, `IDOR_VIOLATION_ATTEMPT`, `GRADE_UPDATE`, and `ROLE_CHANGE` events.
+7. **Security Probe Console**: Click the *"Security Assessment Probe"* tab in the navbar and run all 4 live probes.
